@@ -7,16 +7,19 @@ This repository is a polished demonstration and a frontend foundation. It is not
 ## What works
 
 - Parse the bundled synthetic `.xlsx` workbook in the browser and show row-level validation issues.
+- Explore an expanded 20-building district mock with 123 floors, 362 units, 56 synthetic people, and multi-visit paper histories. Load **探索完整街區** to merge it while preserving existing records; see [district scenarios](./docs/DISTRICT_DEMO.md).
 - Keep imported workbook rows separate from the internal domain model.
 - Browse synthetic buildings on a real OpenStreetMap-based Sai Ying Pun basemap.
 - Select a building, move into a pitched map view, and expand its illustrative floor stack.
 - Inspect floor and unit states, including explicit negative results, uncertain assessments, contact outcomes, and follow-ups.
 - Append a new observation without overwriting earlier history.
 - Persist the synthetic workspace in this browser through a repository and `localStorage` adapter.
+- Print an A4 building paper form; export and merge a Chinese six-sheet Excel workbook with history protection and row-level review.
+- Track housing changes, health support and service invitations with an assignee and unconfirmed timing kept verbatim.
 - Export the current synthetic domain snapshot as JSON.
 - Continue through the building list and forms when the basemap or WebGL is unavailable.
 
-All business records, people, addresses, footprints, floor counts, and unit layouts are synthetic. The map tiles and surrounding building context are real geographic data, while highlighted CareFlow targets are illustrative.
+All business records, people, addresses, floor counts, and unit layouts are synthetic. Highlighted footprints are aligned to source basemap geometry, with synthetic business identities. The map tiles and surrounding building context are real geographic data, while highlighted CareFlow targets are illustrative.
 
 ## Run locally
 
@@ -32,7 +35,7 @@ npm run build
 npm run dev
 ```
 
-Open the local URL printed by Vite. Choose **匯入資料**, then **載入合成範例** to parse the bundled workbook. The generated file is [public/demo/careflow-field-outreach-demo.xlsx](./public/demo/careflow-field-outreach-demo.xlsx).
+Open the local URL printed by Vite. Choose **紙本與 Excel**, then **檢視 mock 範例** to review the Chinese workbook before merging. See [the paper / Excel workflow](./docs/EXCEL_WORKFLOW.md) and [the mock template](./public/demo/careflow-paper-excel-mock.xlsx). The legacy workbook remains supported. The generated file is [public/demo/careflow-field-outreach-demo.xlsx](./public/demo/careflow-field-outreach-demo.xlsx).
 
 `npm run demo:generate` deterministically rebuilds that workbook from [src/data/demoFixture.ts](./src/data/demoFixture.ts). Use `npm run preview` after a build to inspect the production bundle locally.
 

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 import { parseWorkbook } from "./workbookImport";
+import { demoSnapshot } from './demoFixture';
 
 describe("workbook import", () => {
   it("parses the generated synthetic workbook in the browser-compatible parser", () => {
@@ -9,6 +10,7 @@ describe("workbook import", () => {
     const result = parseWorkbook(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     expect(result.issues.filter((issue) => issue.severity === "error")).toEqual([]);
     expect(result.snapshot?.buildings).toHaveLength(4);
+    expect(result.snapshot?.buildings.map(b => b.footprint)).toEqual(demoSnapshot.buildings.map(b => b.footprint));
     expect(result.snapshot?.observations.length).toBeGreaterThan(20);
   });
   it("reports duplicate ids, inconsistent references, and invalid dates deterministically", () => {

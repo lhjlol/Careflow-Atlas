@@ -1,4 +1,5 @@
 import type { Building, Floor, OutreachSnapshot, Unit, Visit, Observation, Person, Household, HouseholdMembership, Membership } from "../domain/types";
+import { alignDemoBuilding } from './demoGeometry';
 
 const synthetic = { isSynthetic: true, provisional: true } as const;
 const buildingDefinitions = [
@@ -8,10 +9,10 @@ const buildingDefinitions = [
   ["bldg-on-wo", "安和樓", "西營盤示範街 24 號（合成）", 0.00031, -0.00048, undefined, false],
 ] as const;
 
-export const demoBuildings: Building[] = buildingDefinitions.map(([id, name, addressLabel, lngOffset, latOffset, floorCount, layoutDeclared]) => ({
+export const demoBuildings: Building[] = buildingDefinitions.map<Building>(([id, name, addressLabel, lngOffset, latOffset, floorCount, layoutDeclared]) => ({
   ...synthetic, id, name, address: addressLabel, layoutDeclared, floorCount, initialCoverage: layoutDeclared ? "UNVISITED" : "UNKNOWN",
   coordinates: { lng: 114.1418 + lngOffset, lat: 22.2863 + latOffset },
-}));
+})).map(alignDemoBuilding);
 
 export const demoFloors: Floor[] = demoBuildings.flatMap((building) => Array.from({ length: building.floorCount ?? 0 }, (_, index) => ({
   ...synthetic, id: `${building.id}-f${index + 1}`, buildingId: building.id, label: `${index + 1}F`, level: index + 1,
@@ -50,7 +51,7 @@ const demoObservations: Observation[] = [
 
 export const demoSnapshot: OutreachSnapshot = {
   schemaVersion: "0.1-demo", isSynthetic: true,
-  notice: "所有業務資料、姓名、座標、地址與樓層單位結構均為合成示例，並非真實住戶或已核實資料。",
+  notice: "業務資料、姓名、地址與樓層單位結構均為合成示例；占地輪廓參照 OpenStreetMap 底圖，不表示真實大廈身份或住戶資料已核實。",
   buildings: demoBuildings, floors: demoFloors, units: demoUnits, households: demoHouseholds,
   people: demoPeople, householdMemberships: demoHouseholdMemberships, householdResidences: [{ ...synthetic, id: "residence-lam", householdId: "household-lam", buildingId: "bldg-yu-an", unitId: "bldg-yu-an-f5-B", startsOn: "2026-09-01" }], memberships: demoMemberships,
   visits: demoVisits, observations: demoObservations,

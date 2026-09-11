@@ -15,6 +15,15 @@ const schemas: Record<string, string[]> = {
   Visits: ["id", "occurredAt", "recordedAt", "workerName"], Observations: ["id", "visitId", "buildingId", "occurredAt", "recordedAt", "workerName", "coverage", "evidence"],
 };
 function text(value: unknown): string | undefined { if (value === undefined || value === null || String(value).trim() === "") return undefined; return String(value).trim(); }
+function footprint(value: unknown, row: number, issues: WorkbookImportIssue[]): number[][] | undefined {
+  if (!text(value)) return undefined;
+  try {
+    return snapshotSchema.shape.buildings.element.shape.footprint.parse(JSON.parse(String(value)));
+  } catch {
+    issue(issues, 'error', 'INVALID_FOOTPRINT', 'Buildings', row, 'footprint', '請使用封閉的經緯度輪廓 JSON 陣列。');
+    return undefined;
+  }
+}
 function bool(value: unknown): boolean | undefined { const valueText = text(value)?.toLowerCase(); if (!valueText) return undefined; if (["true", "yes", "1"].includes(valueText)) return true; if (["false", "no", "0"].includes(valueText)) return false; return undefined; }
 function number(value: unknown): number | undefined { const valueText = text(value); if (!valueText || !/^-?\d+(\.\d+)?$/.test(valueText)) return undefined; return Number(valueText); }
 function strictDate(value: unknown): string | undefined { const valueText = text(value); if (!valueText || !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?(?:Z|[+-]\d{2}:\d{2}))?$/.test(valueText)) return undefined; const [year, month, day] = valueText.slice(0, 10).split("-").map(Number); const date = new Date(Date.UTC(year, month - 1, day)); if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return undefined; const instant = new Date(valueText); return Number.isNaN(instant.valueOf()) ? undefined : valueText; }
@@ -46,7 +55,7 @@ export function parseWorkbook(buffer: ArrayBuffer): WorkbookImportResult {
     if (lng === undefined || lng < -180 || lng > 180) issue(issues, "error", "INVALID_VALUE", "Buildings", rowIndex, "lng", "Longitude must be a number from -180 to 180.");
     if (lat === undefined || lat < -85 || lat > 85) issue(issues, "error", "INVALID_VALUE", "Buildings", rowIndex, "lat", "Latitude must be a number from -85 to 85 for this map.");
     const layoutDeclared = bool(row.layoutDeclared); if (layoutDeclared === undefined) issue(issues, "error", "INVALID_VALUE", "Buildings", rowIndex, "layoutDeclared", "Use true or false.");
-    return { ...synthetic, id, name: requireValue(row, "name", "Buildings", rowIndex, issues) ?? "", address: requireValue(row, "address", "Buildings", rowIndex, issues) ?? "", coordinates: { lng: lng ?? 0, lat: lat ?? 0 }, layoutDeclared: layoutDeclared ?? false, floorCount: number(row.floorCount), initialCoverage: optionalEnum(row.initialCoverage, COVERAGE_STATUSES, "Buildings", rowIndex, issues) };
+    return { ...synthetic, id, name: requireValue(row, "name", "Buildings", rowIndex, issues) ?? "", address: requireValue(row, "address", "Buildings", rowIndex, issues) ?? "", coordinates: { lng: lng ?? 0, lat: lat ?? 0 }, footprint: footprint(row.footprint, rowIndex, issues), layoutDeclared: layoutDeclared ?? false, floorCount: number(row.floorCount), initialCoverage: optionalEnum(row.initialCoverage, COVERAGE_STATUSES, "Buildings", rowIndex, issues) };
   });
   const floors: Floor[] = data.Floors.map((row, index) => ({ ...synthetic, id: requireValue(row, "id", "Floors", index + 2, issues) ?? `invalid-floor-${index}`, buildingId: requireValue(row, "buildingId", "Floors", index + 2, issues) ?? "", level: number(row.level) ?? invalid(issues, "Floors", index + 2, "level", "A numeric floor level is required."), label: requireValue(row, "label", "Floors", index + 2, issues) ?? "" }));
   const units: Unit[] = data.Units.map((row, index) => ({ ...synthetic, id: requireValue(row, "id", "Units", index + 2, issues) ?? `invalid-unit-${index}`, buildingId: requireValue(row, "buildingId", "Units", index + 2, issues) ?? "", floorId: requireValue(row, "floorId", "Units", index + 2, issues) ?? "", label: requireValue(row, "label", "Units", index + 2, issues) ?? "", initialCoverage: optionalEnum(row.initialCoverage, COVERAGE_STATUSES, "Units", index + 2, issues) }));

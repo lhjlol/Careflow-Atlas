@@ -2,3 +2,17 @@
 .cf-building-panel{width:100%;scrollbar-width:thin;scrollbar-color:#d7e3dc transparent}.cf-building-header{justify-content:flex-start;gap:10px}.cf-building-header>div{min-width:0}.cf-building-header h2{font-size:23px;font-weight:550;margin:7px 0}.cf-building-header p{font-size:12px;line-height:1.6}.cf-eyebrow{font-size:11px;font-weight:550}.cf-stats{border-radius:10px;gap:0;background:#f6f8f5}.cf-stats div{background:transparent;border-radius:0;padding:13px 8px}.cf-stats div+div{border-left:1px solid #e6ece5}.cf-stats strong{font-size:23px;font-weight:550}.cf-stats span{font-size:11px}.cf-stats small{font-size:13px}.cf-section-heading h3{font-size:16px;font-weight:550}.cf-section-heading>span{font-size:12px;color:#8a9b8d}.cf-floor-strip{display:grid;grid-template-columns:repeat(4,1fr);overflow:visible;gap:7px;padding-top:13px}.cf-floor-strip button{min-width:0;min-height:47px;border-radius:7px;font-size:13px;font-weight:500}.cf-floor-strip button span{font-size:10px}.cf-units button{min-height:74px;border-radius:8px}.cf-units button span{font-size:14px;font-weight:500}.cf-units button small{font-size:12px;line-height:1.6}.cf-button{font-size:14px;font-weight:500;border-radius:8px}.cf-empty p{font-size:13px}.cf-event h4{font-size:14px;line-height:1.8;font-weight:500}.cf-event__meta,.cf-chip{font-size:11px}.cf-event__note{font-size:13px;line-height:1.7}.cf-event__recorded{font-size:11px}.cf-followup{font-size:13px;line-height:1.7}.cf-form-grid label,.cf-editor label,.cf-callout,.cf-followup-fields legend{font-size:14px}.cf-form-grid input,.cf-form-grid select,.cf-form-grid textarea,.cf-editor input{font-size:14px}.cf-dialog h2{font-size:23px;font-weight:550}.cf-dialog__footer,.cf-issue-row{font-size:12px}.cf-dialog__header{align-items:center}.cf-followup-fields label:has(input[type=checkbox]){display:flex;flex-direction:row;align-items:center;grid-column:1/-1;line-height:1.7;font-weight:400}.cf-followup-fields input[type=checkbox]{width:18px;min-height:18px;accent-color:var(--teal)}
 
 .cf-review__summary small { display:block; margin-top:3px; color:var(--cf-muted); }
+/* Desktop paper-to-Excel handoff. */
+.cf-dialog--import{width:min(1080px,94vw);max-width:min(1080px,94vw)}
+.excel-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0}
+.excel-steps section{padding:20px;background:#f4f7f4;border:1px solid #d9e3dc;border-radius:10px}
+.excel-steps b{font-size:12px;color:#6d8275;font-variant-numeric:tabular-nums}
+.excel-steps h3{font-size:18px;margin:10px 0}
+.excel-steps p{font-size:14px;line-height:1.7;color:#506456;min-height:48px;margin-bottom:16px}
+.excel-steps button{width:100%;justify-content:center}
+.excel-merge-summary{display:flex;gap:24px;padding:14px 18px;background:#eef5f0;border-radius:8px;font-size:14px;margin:16px 0}
+.excel-merge-summary b{margin-left:6px;font-variant-numeric:tabular-nums}
+.cf-import-actions{flex-wrap:wrap}
+
+.excel-record-preview>div{max-height:230px;overflow:auto;border:1px solid var(--line,#d9e2dc);border-radius:8px}.excel-record-preview article{padding:12px 16px;border-bottom:1px solid #e1e8e2}.excel-record-preview article:last-child{border:0}.excel-record-preview strong{font-size:13px}.excel-record-preview p{font-size:13px;line-height:1.7;margin:5px 0 0;color:#5e6d63}.excel-record-preview h3{font-size:14px}.excel-record-preview h3 span{font-weight:400;color:#6d7b72;margin-left:8px}
+.cf-success{background:#edf6f0;color:#286048}

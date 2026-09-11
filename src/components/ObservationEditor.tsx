@@ -1,6 +1,6 @@
 import { AlertCircle, CalendarDays, FileText, Save, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import type { ContactOutcome, CoverageStatus, HousingAssessment, OpenFollowUp } from "../domain/types";
+import { supportCategoryLabels, type ContactOutcome, type CoverageStatus, type HousingAssessment, type OpenFollowUp, type Observation } from "../domain/types";
 
 export interface ObservationDraft {
   subjectId: string;
@@ -11,7 +11,7 @@ export interface ObservationDraft {
   sourceType?: "STAFF_OBSERVATION" | "RESIDENT_REPORT" | "UNKNOWN";
   note: string;
   evidence: string[];
-  followUp?: { action: string; dueDate?: string; status: "OPEN" };
+  followUp?: Observation['followUp'];
   resolvesObservationId?: string;
 }
 
@@ -57,6 +57,7 @@ export function ObservationEditor({ open, targetLabel, subjectId, openFollowUps 
     const data = new FormData(event.currentTarget);
     setSaving(true); setError("");
     try {
+      if (!String(data.get('followUpReason') ?? '').trim() && ['assignee', 'timingNote', 'followUpDueAt'].some(key => String(data.get(key) ?? '').trim())) throw new Error('已填跟進資料，請寫明跟進行動。');
       await onSubmit({
         subjectId,
         coverage: String(data.get("coverageStatus")) as CoverageStatus,
@@ -66,7 +67,7 @@ export function ObservationEditor({ open, targetLabel, subjectId, openFollowUps 
         occurredAt: new Date(String(data.get("occurredAt"))).toISOString(),
         note: [String(data.get("finding") ?? ""), String(data.get("note") ?? "")].filter(Boolean).join("\n"),
         evidence: String(data.get("evidence") ?? "").split(/\n|；/).map((item) => item.trim()).filter(Boolean),
-        followUp: String(data.get("followUpReason") ?? "") ? { action: String(data.get("followUpReason")), dueDate: String(data.get("followUpDueAt") ?? "") || undefined, status: "OPEN" } : undefined,
+        followUp: String(data.get("followUpReason") ?? "") ? { action: String(data.get("followUpReason")), dueDate: String(data.get("followUpDueAt") ?? "") || undefined, status: "OPEN", category: String(data.get('category')) as NonNullable<Observation['followUp']>['category'], assignee: String(data.get('assignee') ?? '') || undefined, timingNote: String(data.get('timingNote') ?? '') || undefined } : undefined,
         resolvesObservationId: String(data.get("resolvesObservationId") ?? "") || undefined,
       });
       dialogRef.current?.close();
@@ -80,7 +81,7 @@ export function ObservationEditor({ open, targetLabel, subjectId, openFollowUps 
   return (
     <dialog aria-labelledby="observation-title" ref={dialogRef} className="cf-dialog" onCancel={(event) => { event.preventDefault(); close(); }} onClose={() => { if (open && !saving) onClose(); }}>
       <form className="cf-editor" onSubmit={submit}>
-        <header className="cf-dialog__header"><div><span className="cf-eyebrow">追加現場記錄</span><h2 id="observation-title">{targetLabel}</h2></div><button type="button" className="cf-icon-button" onClick={close} aria-label="關閉"><X /></button></header>
+        <header className="cf-dialog__header"><div><span className="cf-eyebrow">中心補錄／追加結果</span><h2 id="observation-title">{targetLabel}</h2></div><button type="button" className="cf-icon-button" onClick={close} aria-label="關閉"><X /></button></header>
         <p className="cf-callout"><AlertCircle size={17} />三個結果分開記錄；「無人應門」不會清除住房線索。</p>
         <div className="cf-form-grid">
           <label><span>覆蓋狀態</span><select name="coverageStatus" defaultValue="ATTEMPTED"><option value="UNKNOWN">未能確定</option><option value="UNVISITED">尚未到訪</option><option value="ATTEMPTED">曾嘗試</option><option value="PARTIAL">部分完成</option><option value="VISITED_NO_FINDING">已到訪，未記錄發現</option><option value="VISITED_WITH_FINDING">已到訪，有記錄</option><option value="INACCESSIBLE">未能進入</option></select></label>
@@ -93,6 +94,7 @@ export function ObservationEditor({ open, targetLabel, subjectId, openFollowUps 
           <label className="cf-field--wide"><span>證據說明</span><input name="evidence" placeholder="例如：門牌細分；居民口述（不會自動判定）" /></label>
         </div>
         <fieldset className="cf-followup-fields"><legend><CalendarDays size={17} />可選跟進</legend><label><span>跟進行動</span><input name="followUpReason" placeholder="例如：與同事討論後再訪" /></label><label><span>限期</span><input type="date" name="followUpDueAt" /></label></fieldset>
+        <div className="cf-form-grid"><label><span>跟進類別</span><select name="category" defaultValue="GENERAL">{Object.entries(supportCategoryLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label><span>負責人（可選）</span><input name="assignee" /></label><label className="cf-field--wide"><span>時間原話／待確認</span><input name="timingNote" placeholder="例如：翌日午後，實際日期待確認" /></label></div>
         {openFollowUps.length > 0 && <label className="cf-resolve-field"><span>同時結束既有復訪（可選）</span><select name="resolvesObservationId" defaultValue=""><option value="">保留所有待跟進項目</option>{openFollowUps.map((item) => <option key={item.observationId} value={item.observationId}>{item.action}{item.dueDate ? ` · ${item.dueDate}` : ""}</option>)}</select><small>舊記錄仍保留；這次新增的事件會註明已結束哪一項復訪。</small></label>}
         {error && <p role="alert" className="cf-error"><AlertCircle size={17} />{error}</p>}
         <footer className="cf-dialog__footer"><span>儲存會追加新事件，不會覆蓋舊記錄。</span><div><button type="button" className="cf-button cf-button--ghost" onClick={close}>取消</button><button className="cf-button cf-button--primary" disabled={saving}><Save size={17} />{saving ? "儲存中…" : "儲存記錄"}</button></div></footer>

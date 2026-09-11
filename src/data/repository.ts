@@ -1,5 +1,6 @@
 import type { OutreachSnapshot, SaveObservationInput } from '../domain/types';
 import { observationSchema, validateSnapshot } from '../domain/schema';
+import { alignDemoSnapshot } from './demoGeometry';
 
 export class PersistenceError extends Error {
   constructor(message: string, public readonly cause?: unknown) { super(message); this.name = 'PersistenceError'; }
@@ -23,7 +24,7 @@ export class OutreachRepository {
   getSnapshot(): OutreachSnapshot | undefined {
     const raw = this.adapter.read(this.key);
     if (!raw) return undefined;
-    try { return validateSnapshot(JSON.parse(raw)); }
+    try { return alignDemoSnapshot(validateSnapshot(JSON.parse(raw))); }
     catch (error) { throw new PersistenceError('本機資料格式不完整，尚未取代或刪除。', error); }
   }
   replaceSnapshot(snapshot: OutreachSnapshot): OutreachSnapshot { return this.persist(snapshot); }
@@ -46,7 +47,7 @@ export class OutreachRepository {
   }
   private persist(value: OutreachSnapshot): OutreachSnapshot {
     let snapshot: OutreachSnapshot;
-    try { snapshot = validateSnapshot(value); }
+    try { snapshot = alignDemoSnapshot(validateSnapshot(value)); }
     catch (error) { throw new PersistenceError('資料關聯或格式不正確，原有資料未改動。', error); }
     try { this.adapter.write(this.key, JSON.stringify(snapshot)); }
     catch (error) { if (error instanceof PersistenceError) throw error; throw new PersistenceError('本機儲存失敗，原有資料未改動。', error); }

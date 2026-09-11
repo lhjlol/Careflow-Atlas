@@ -15,6 +15,8 @@ export const OBSERVATION_STATUSES = COVERAGE_STATUSES;
 
 export const FOLLOW_UP_STATUSES = ["OPEN", "DONE"] as const;
 export type FollowUpStatus = (typeof FOLLOW_UP_STATUSES)[number];
+export const SUPPORT_CATEGORIES = ['GENERAL', 'HOUSING_CHANGE', 'HEALTH_SUPPORT', 'SERVICE_INVITATION'] as const;
+export const supportCategoryLabels = { GENERAL: '一般跟進', HOUSING_CHANGE: '住屋變動', HEALTH_SUPPORT: '健康關懷', SERVICE_INVITATION: '服務邀約' };
 
 export interface SyntheticRecord { isSynthetic: true; provisional: true; }
 export interface Coordinates { lng: number; lat: number; }
@@ -26,7 +28,7 @@ export interface Building extends SyntheticRecord {
 export interface Floor extends SyntheticRecord { id: string; buildingId: string; level: number; label: string; }
 export interface Unit extends SyntheticRecord { id: string; buildingId: string; floorId: string; label: string; initialCoverage?: CoverageStatus; }
 export interface Household extends SyntheticRecord { id: string; label?: string; }
-export interface Person extends SyntheticRecord { id: string; displayName: string; }
+export interface Person extends SyntheticRecord { id: string; displayName: string; phone?: string; addressNote?: string; contactNote?: string; }
 export interface HouseholdMembership extends SyntheticRecord { id: string; householdId: string; personId: string; relationship?: string; }
 export interface HouseholdResidence extends SyntheticRecord { id: string; householdId: string; unitId?: string; buildingId: string; startsOn?: string; endsOn?: string; locationNote?: string; }
 export interface Membership extends SyntheticRecord { id: string; personId: string; status: "PENDING" | "ACTIVE" | "INACTIVE" | "UNKNOWN"; startsOn?: string; endsOn?: string; }
@@ -40,7 +42,10 @@ export interface Observation extends SyntheticRecord {
   contactOutcome?: ContactOutcome; /** Independent from assessment and coverage. */
   sourceType?: "STAFF_OBSERVATION" | "RESIDENT_REPORT" | "UNKNOWN";
   evidence: string[]; note?: string;
-  followUp?: { action: string; dueDate?: string; status: FollowUpStatus };
+  followUp?: { action: string; dueDate?: string; status: FollowUpStatus; category?: typeof SUPPORT_CATEGORIES[number]; assignee?: string; timingNote?: string };
+  paperRef?: string;
+  paperLine?: string;
+  importSource?: { file: string; sheet: string; row: number };
   /** A DONE follow-up event must name the open observation it closes. */
   resolvesObservationId?: string;
 }

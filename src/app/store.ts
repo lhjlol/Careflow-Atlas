@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { OutreachSnapshot, SaveObservationInput } from '../domain/types';
 import { LocalStoragePersistenceAdapter, OutreachRepository } from '../data/repository';
+import { mergeWorkflow } from '../data/workflowMerge';
 
 const repository = new OutreachRepository(new LocalStoragePersistenceAdapter());
 interface WorkspaceState {
@@ -12,6 +13,7 @@ interface WorkspaceState {
   expanded: boolean;
   initialize: () => void;
   importSnapshot: (snapshot: OutreachSnapshot) => void;
+  mergeSnapshot: (snapshot: OutreachSnapshot, baseline?: OutreachSnapshot) => void;
   saveObservation: (input: SaveObservationInput) => void;
   selectBuilding: (id?: string) => void;
   selectFloor: (id: string) => void;
@@ -29,15 +31,21 @@ export const useWorkspace = create<WorkspaceState>((set, get) => ({
     const saved = repository.replaceSnapshot(snapshot);
     set({ snapshot: saved, selectedBuildingId: undefined, selectedFloorId: undefined, selectedUnitId: undefined, expanded: false, storageError: undefined });
   },
+  mergeSnapshot: (incoming, baseline) => {
+    const result = mergeWorkflow(repository.getSnapshot(), incoming, baseline);
+    if (!result.snapshot) throw new Error(result.issues.map(i => i.message).join('\n'));
+    const saved = repository.replaceSnapshot(result.snapshot);
+    set({ snapshot: saved, storageError: undefined });
+  },
   saveObservation: input => {
     const saved = repository.saveObservation(input);
     set({ snapshot: saved, storageError: undefined });
   },
-  selectBuilding: id => set({ selectedBuildingId: id, selectedFloorId: undefined, selectedUnitId: undefined, expanded: false }),
+  selectBuilding: id => set({ selectedBuildingId: id, selectedFloorId: undefined, selectedUnitId: undefined, expanded: !!id && !!get().snapshot?.floors.some(floor => floor.buildingId === id) }),
   selectFloor: id => set({ selectedFloorId: id, selectedUnitId: undefined, expanded: true }),
   selectUnit: id => {
     const unit = get().snapshot?.units.find(u => u.id === id);
-    if (unit) set({ selectedBuildingId: unit.buildingId, selectedFloorId: unit.floorId, selectedUnitId: id });
+    if (unit) set({ selectedBuildingId: unit.buildingId, selectedFloorId: unit.floorId, selectedUnitId: id, expanded: true });
   },
   toggleExpanded: () => set(state => ({ expanded: !state.expanded })),
 }));
