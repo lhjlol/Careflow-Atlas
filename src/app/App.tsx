@@ -10,6 +10,7 @@ import { ObservationEditor, type ObservationDraft } from '../components/Observat
 import { ImportDialog, type ImportReview } from '../components/ImportDialog';
 import { PaperForm } from '../components/PaperForm';
 import { mergeWorkflow } from '../data/workflowMerge';
+import { detectWorkbook, mergeOverride, recognitionBlocker, remapWorkbook, type MappingOverride } from '../imports/detector';
 import '../components/workflow.css';
 import '../styles.css';
 import '../refinement.css';
@@ -27,6 +28,8 @@ export default function App() {
   const { snapshot, selectedBuildingId, selectedFloorId, selectedUnitId, expanded } = workspace;
   const [importOpen, setImportOpen] = useState(false);
   const [importReview, setImportReview] = useState<ImportReview>();
+  const importSource = useRef<{ buffer: ArrayBuffer; fileName: string } | undefined>(undefined);
+  const importOverride = useRef<MappingOverride>({});
   const [pendingSnapshot, setPendingSnapshot] = useState<OutreachSnapshot>();
   const [importBaseline, setImportBaseline] = useState<OutreachSnapshot>();
   const [paperOpen, setPaperOpen] = useState(false);
@@ -72,19 +75,32 @@ export default function App() {
   const followupCount = snapshot?.buildings.reduce((sum, b) => sum + getCoverageSummary(snapshot, b.id).followUps, 0) ?? 0;
   const hasDistrictDemo = snapshot?.buildings.some(building => building.id === 'district-16');
 
-  const openImport = () => { setImportReview(undefined); setPendingSnapshot(undefined); setImportBaseline(undefined); setImportError(undefined); setImportOpen(true); };
-  const parseFile = async (buffer: ArrayBuffer, fileName: string) => {
+  const openImport = () => { setImportReview(undefined); setPendingSnapshot(undefined); setImportBaseline(undefined); setImportError(undefined); importSource.current = undefined; importOverride.current = {}; setImportOpen(true); };
+  const parseFile = async (buffer: ArrayBuffer, fileName: string, override?: MappingOverride) => {
     const { parseWorkbook } = await import('../data/workbookImport');
     const { parseWorkflowWorkbook } = await import('../data/workflowWorkbook');
     const workflow = parseWorkflowWorkbook(buffer, fileName);
     const result = workflow ?? parseWorkbook(buffer);
     const merged = result.snapshot ? mergeWorkflow(workspace.snapshot, result.snapshot, workflow?.baseline) : undefined;
+    importOverride.current = override ?? {};
+    const recognition = detectWorkbook(buffer, importOverride.current);
+    importSource.current = { buffer, fileName };
     setPendingSnapshot(result.snapshot); setImportBaseline(workflow?.baseline);
     const preview = result.snapshot?.observations.filter(o => !workspace.snapshot?.observations.some(current => current.id === o.id)).map(o => ({
       label: `${result.snapshot!.buildings.find(b => b.id === o.buildingId)?.name ?? o.buildingId} · ${result.snapshot!.units.find(u => u.id === o.unitId)?.label ?? result.snapshot!.floors.find(f => f.id === o.floorId)?.label ?? '大廈層面'} · ${o.occurredAt.slice(0, 10)}`,
       detail: [o.paperRef ? `紙本 ${o.paperRef}／${o.paperLine ?? '—'}` : '', o.note, o.followUp?.action, o.followUp?.timingNote].filter(Boolean).join(' · '),
     }));
-    setImportReview({ fileName, issues: [...result.issues, ...(merged?.issues ?? [])], counts: result.counts, canReplace: !!merged?.snapshot, changes: merged?.summary, preview });
+    setImportReview({ fileName, issues: [...result.issues, ...(merged?.issues ?? [])], counts: result.counts, canReplace: !!merged?.snapshot, changes: merged?.summary, preview, recognition });
+  };
+  /** Re-runs recognition only: the person's corrections change the preview, never the data. */
+  const remapImport = (change: MappingOverride) => {
+    const source = importSource.current;
+    if (!source) return;
+    // The preview on screen is the format in effect; compare against that, not the
+    // forced one, so confirming the detected format keeps the column choices.
+    importOverride.current = mergeOverride(importOverride.current, change, importReview?.recognition?.profileId);
+    const recognition = remapWorkbook(source.buffer, importOverride.current);
+    setImportReview(current => current ? { ...current, recognition } : current);
   };
   const loadFile = async (file: File) => {
     setImportLoading(true); setImportError(undefined); setPendingSnapshot(undefined); setImportReview(undefined);
@@ -115,6 +131,9 @@ export default function App() {
   };
   const confirmImport = () => {
     if (!pendingSnapshot) return;
+    // The dialog disables the button too; this is the same rule for the keyboard path.
+    const blocked = recognitionBlocker(importReview?.recognition);
+    if (blocked) throw new Error(blocked);
     try { workspace.mergeSnapshot(pendingSnapshot, importBaseline); setImportOpen(false); setToast('已合併 Excel 回錄，舊記錄與到訪歷史保留。'); }
     catch (error) { throw error instanceof Error ? error : new Error('未能儲存，原有資料未改動。'); }
   };
@@ -191,7 +210,7 @@ export default function App() {
     {workspace.storageError && <div className="storage-banner" role="alert">{workspace.storageError}</div>}
     {toast && <div className="toast" key={toast} role="status"><Check size={17} /><span>{toast}</span><button aria-label="關閉提示" onClick={() => setToast('')}><X size={16} /></button></div>}
     {helpOpen && <div ref={helpRef} id="demo-help" className="help-popover" role="region" aria-label="示範說明"><strong>這是一個外展流程示範</strong><p>所有業務記錄、住戶及樓層結構均為合成。地圖底圖由 OpenFreeMap / OpenStreetMap 提供。</p><ol><li>匯入附帶的 Excel 並檢視欄位提示。</li><li>選擇大廈，展開樓層並找出待跟進單位。</li><li>追加結果，查看歷史和覆蓋狀態的變化。</li></ol><p>只在這個瀏覽器儲存，尚未提供跨裝置同步。</p><button onClick={() => setHelpOpen(false)}>知道了</button></div>}
-    <ImportDialog notice={toast.startsWith('Excel 已準備') ? toast : undefined} open={importOpen} review={importReview} loading={importLoading} error={importError} onClose={() => setImportOpen(false)} onFile={loadFile} onLoadSample={loadSample} onLoadDistrict={loadDistrict} onDownloadDistrict={() => download('/demo/careflow-district-demo.xlsx', 'CareFlow_街區擴展_mock.xlsx')} onDownloadSample={() => download('/demo/careflow-paper-excel-mock.xlsx', 'CareFlow_紙本回錄_mock範本.xlsx')} onExport={snapshot ? () => void exportExcel() : undefined} onBackup={snapshot ? exportData : undefined} onPrint={snapshot?.buildings.length ? () => { setImportOpen(false); setPaperOpen(true); } : undefined} onRetry={openImport} onConfirmReplace={confirmImport} />
+    <ImportDialog notice={toast.startsWith('Excel 已準備') ? toast : undefined} open={importOpen} review={importReview} loading={importLoading} error={importError} onClose={() => setImportOpen(false)} onFile={loadFile} onLoadSample={loadSample} onLoadDistrict={loadDistrict} onDownloadDistrict={() => download('/demo/careflow-district-demo.xlsx', 'CareFlow_街區擴展_mock.xlsx')} onDownloadSample={() => download('/demo/careflow-paper-excel-mock.xlsx', 'CareFlow_紙本回錄_mock範本.xlsx')} onExport={snapshot ? () => void exportExcel() : undefined} onBackup={snapshot ? exportData : undefined} onPrint={snapshot?.buildings.length ? () => { setImportOpen(false); setPaperOpen(true); } : undefined} onRetry={openImport} onRemap={remapImport} onConfirmReplace={confirmImport} />
     {paperOpen && snapshot && <PaperForm snapshot={snapshot} buildingId={selectedBuildingId} onClose={() => setPaperOpen(false)} />}
     {editTarget && <ObservationEditor open openFollowUps={snapshot ? getOpenFollowUps(snapshot).filter(task => task.buildingId === editTarget.buildingId && task.floorId === editTarget.floorId && task.unitId === editTarget.unitId) : []} targetLabel={editTarget.label} subjectId={editTarget.unitId ?? editTarget.buildingId} subjectType={editTarget.unitId ? 'UNIT' : 'BUILDING'} onClose={() => setEditTarget(undefined)} onSubmit={saveObservation} />}
   </div>;
