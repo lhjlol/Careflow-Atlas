@@ -1,7 +1,7 @@
 # CLAUDE.md — CareFlow Atlas 项目工作约定
 
-> 本文件是 CareFlow Atlas 仓库内的工作约定，由 2026-09-13 对 `BACKEND_GAP_ANALYSIS_副本.md` 的两轮评审经验整理而成。
-> 计划全文以 [BACKEND_GAP_ANALYSIS_副本.md](BACKEND_GAP_ANALYSIS_副本.md) 为准；本文件只固化「动工前必须遵守什么」，不复制计划内容。
+> 本文件是 CareFlow Atlas 仓库内的工作约定，由 2026-09-13 对 `BACKEND_GAP_ANALYSIS.md` 的两轮评审经验整理而成。
+> 计划全文以 [BACKEND_GAP_ANALYSIS.md](BACKEND_GAP_ANALYSIS.md) 为准；本文件只固化「动工前必须遵守什么」，不复制计划内容。
 
 ## 1. 项目当前状态
 

@@ -47,8 +47,9 @@
 | 首次分析的交付 | 按用户确认更新该副本并同步 `plan.md`；不重建原文件，不改 `plan_副本.md` 或业务代码 |
 | 本次修订的工作目录 | `/Users/lhj/Desktop/Light/洗楼系统/Careflow-Atlas`（不是上表的 checkout） |
 | 本次修订的分支／HEAD | `main`、`8127ef3`（与首次分析同一提交） |
-| 本次修订前的工作树 | `git status` 只有三个未跟踪文件：本副本、`CareFlow_紙本回錄_mock範本.xlsx`、`CareFlow_街區擴展_mock.xlsx`；该目录没有 `plan.md`、`plan_副本.md` 或 `BACKEND_GAP_ANALYSIS.md`，也没有已修改的受跟踪文件 |
-| 本次修订的交付 | 只改本副本；不新建 `plan.md`，不改业务代码、依赖或资源 |
+| 本次修订前的工作树 | `git status` 只有三个未跟踪文件：`BACKEND_GAP_ANALYSIS_副本.md`、`CareFlow_紙本回錄_mock範本.xlsx`、`CareFlow_街區擴展_mock.xlsx`；该目录没有 `plan.md`、`plan_副本.md` 或 `BACKEND_GAP_ANALYSIS.md`，也没有已修改的受跟踪文件 |
+| 本次修订的交付 | 只改本文件；不新建 `plan.md`，不改业务代码、依赖或资源 |
+| 本次修订的改名 | 本文件由 `BACKEND_GAP_ANALYSIS_副本.md` 改名为 `BACKEND_GAP_ANALYSIS.md`；原 `BACKEND_GAP_ANALYSIS.md` 已不在磁盘，改名是为去掉「副本」带来的歧义，两个 mock 工作簿仍不纳入提交 |
 
 用户反馈另有四个未提交文件涉及镜头防遮挡修复，但当前 checkout 未显示这些改动。反馈中的 `/Users/jiahangx/Projects/Careflow-Atlas` 不是本次工作目录。因此本文不宣称审阅过那四个文件，也不把当前工作树称为干净。后续开发前应重新确认相关 diff 的归属，不能覆盖、还原或顺带格式化镜头修复。
 
