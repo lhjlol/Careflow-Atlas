@@ -48,6 +48,10 @@ export interface Observation extends SyntheticRecord {
   importSource?: { file: string; sheet: string; row: number };
   /** A DONE follow-up event must name the open observation it closes. */
   resolvesObservationId?: string;
+  /** Names the original event this one corrects. The original is superseded, never rewritten. */
+  correctsObservationId?: string;
+  /** Why the correction was made. For traceability only; never part of coverage comparison. */
+  correctionReason?: string;
 }
 export interface OutreachSnapshot {
   schemaVersion: "0.1-demo"; isSynthetic: true; notice: string;
@@ -63,15 +67,45 @@ export interface SaveObservationInput {
   sourceType?: Observation["sourceType"];
   followUp?: Observation["followUp"];
   resolvesObservationId?: string;
+  correctsObservationId?: string;
+  correctionReason?: string;
+}
+
+/** Ids of events that at least one correction points at. They stay in history, out of coverage. */
+export function supersededObservationIds(observations: Observation[]): Set<string> {
+  const known = new Set(observations.map((item) => item.id));
+  const superseded = new Set<string>();
+  for (const item of observations) if (item.correctsObservationId && known.has(item.correctsObservationId)) superseded.add(item.correctsObservationId);
+  return superseded;
+}
+
+/** The candidate set for coverage, summaries and follow-ups: the effective version of each event. */
+export function effectiveObservations(snapshot: OutreachSnapshot): Observation[] {
+  const superseded = supersededObservationIds(snapshot.observations);
+  return snapshot.observations.filter((item) => !superseded.has(item.id));
+}
+
+export interface CorrectionConflict { observationId: string; correctionIds: string[]; }
+/** Two live corrections for one original cannot be ordered by time; a human must pick one. */
+export function getCorrectionConflicts(snapshot: OutreachSnapshot): CorrectionConflict[] {
+  const superseded = supersededObservationIds(snapshot.observations);
+  const live = new Map<string, string[]>();
+  for (const item of snapshot.observations) {
+    if (!item.correctsObservationId || superseded.has(item.id)) continue;
+    live.set(item.correctsObservationId, [...live.get(item.correctsObservationId) ?? [], item.id]);
+  }
+  return [...live.entries()].filter(([, ids]) => ids.length > 1).map(([observationId, correctionIds]) => ({ observationId, correctionIds }));
 }
 
 export interface OpenFollowUp { observationId: string; buildingId: string; floorId?: string; unitId?: string; action: string; dueDate?: string; }
 export function getOpenFollowUps(snapshot: OutreachSnapshot): OpenFollowUp[] {
+  // A closure keeps counting after a correction, so a task never reopens or closes on its own.
   const resolved = new Set(snapshot.observations.map((item) => item.resolvesObservationId).filter((id): id is string => Boolean(id)));
-  return snapshot.observations.filter((item) => item.followUp?.status === "OPEN" && !resolved.has(item.id)).map((item) => ({ observationId: item.id, buildingId: item.buildingId, floorId: item.floorId, unitId: item.unitId, action: item.followUp!.action, dueDate: item.followUp!.dueDate }));
+  return effectiveObservations(snapshot).filter((item) => item.followUp?.status === "OPEN" && !resolved.has(item.id)).map((item) => ({ observationId: item.id, buildingId: item.buildingId, floorId: item.floorId, unitId: item.unitId, action: item.followUp!.action, dueDate: item.followUp!.dueDate }));
 }
 
-function compareObservationTime(left: Observation, right: Observation): number {
+/** Occurrence time first, entry time only as a tie-breaker. Exported so views order the same way. */
+export function compareObservationTime(left: Observation, right: Observation): number {
   return Date.parse(left.occurredAt) - Date.parse(right.occurredAt) || Date.parse(left.recordedAt) - Date.parse(right.recordedAt);
 }
 function latestObservation(records: Observation[]): Observation | undefined {
@@ -79,7 +113,7 @@ function latestObservation(records: Observation[]): Observation | undefined {
 }
 
 export function getCoverageStatus(snapshot: OutreachSnapshot, buildingId: string, unitId?: string): CoverageStatus {
-  const records = snapshot.observations.filter((item) => item.buildingId === buildingId && (!unitId || item.unitId === unitId));
+  const records = effectiveObservations(snapshot).filter((item) => item.buildingId === buildingId && (!unitId || item.unitId === unitId));
   if (unitId && records.length) return latestObservation(records)!.coverage;
   const explicitBuildingRecord = latestObservation(records.filter((item) => !item.floorId && !item.unitId));
   if (explicitBuildingRecord) return explicitBuildingRecord.coverage;
@@ -90,7 +124,7 @@ export interface CoverageSummary { total?: number; recorded: number; completed: 
 /** Does not turn a unit event into a whole-building result. */
 export function getCoverageSummary(snapshot: OutreachSnapshot, buildingId: string, floorId?: string): CoverageSummary {
   const scopeUnits = snapshot.units.filter((unit) => unit.buildingId === buildingId && (!floorId || unit.floorId === floorId));
-  const scopedRecords = snapshot.observations.filter((item) => item.buildingId === buildingId && (!floorId || item.floorId === floorId));
+  const scopedRecords = effectiveObservations(snapshot).filter((item) => item.buildingId === buildingId && (!floorId || item.floorId === floorId));
   const latestByUnit = new Map<string, Observation>();
   scopedRecords.filter((item) => item.unitId).forEach((item) => { const prior = latestByUnit.get(item.unitId!); if (!prior || compareObservationTime(item, prior) > 0) latestByUnit.set(item.unitId!, item); });
   const completed = [...latestByUnit.values()].filter((item) => ["VISITED_NO_FINDING", "VISITED_WITH_FINDING"].includes(item.coverage)).length;

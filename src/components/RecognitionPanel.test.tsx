@@ -27,7 +27,8 @@ describe('recognition preview', () => {
     const { html } = render('careflow-six-sheet/ambiguous');
     expect(html).toContain('有待核對');
     expect(html).toContain('請選擇…');
-    expect(html).toContain('可能欄位：7. 工作員、23. 工作人員');
+    // Positions are derived: the duplicate column is appended past the real headers.
+    expect(html).toContain(`可能欄位：${paperHeaders.indexOf('工作員') + 1}. 工作員、${paperHeaders.length + 1}. 工作人員`);
   });
 
   it('explains a refused recognition instead of showing an empty mapping table', () => {

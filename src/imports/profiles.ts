@@ -30,7 +30,8 @@ export type CanonicalField =
   | 'occurredAt' | 'occurredTime' | 'recordedAt' | 'worker' | 'coverage' | 'contactOutcome'
   | 'assessment' | 'sourceType' | 'note' | 'evidence'
   | 'followUpCategory' | 'followUpAction' | 'followUpAssignee' | 'followUpDueDate'
-  | 'followUpTimingNote' | 'resolvesObservationId';
+  | 'followUpTimingNote' | 'resolvesObservationId'
+  | 'correctsObservationId' | 'correctionReason';
 
 export interface FieldSpec {
   key: CanonicalField;
@@ -119,6 +120,8 @@ const paperExcelFields: FieldSpec[] = [
   { key: 'followUpDueDate', label: '確定跟進日期', aliases: ['確定跟進日期', '确定跟进日期', '跟進日期', '到期日', 'due date', 'duedate'], kind: 'date' },
   { key: 'followUpTimingNote', label: '時間原話', aliases: ['時間原話／待確認', '時間原話', '时间原话', '待確認', 'timing note'] },
   { key: 'resolvesObservationId', label: '結束跟進編號', aliases: ['結束跟進編號', '结束跟进编号', '結束跟進', 'resolves'] },
+  { key: 'correctsObservationId', label: '更正原記錄編號', aliases: ['更正原記錄編號', '更正原记录编号', '更正原記錄', '原記錄編號', 'corrects'] },
+  { key: 'correctionReason', label: '更正原因', aliases: ['更正原因', '更正理由', 'correction reason'] },
 ];
 
 const legacyFields: FieldSpec[] = [

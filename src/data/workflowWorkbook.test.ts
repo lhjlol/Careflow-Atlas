@@ -6,7 +6,7 @@ import { demoSnapshot } from './demoFixture';
 import { exportWorkflowWorkbook, parseWorkflowWorkbook } from './workflowWorkbook';
 import { mergeWorkflow } from './workflowMerge';
 import { excelDate, paperHeaders } from './workflowFormat';
-import { getOpenFollowUps, type OutreachSnapshot } from '../domain/types';
+import { getCoverageStatus, getOpenFollowUps, type OutreachSnapshot } from '../domain/types';
 
 const now = '2026-09-11T04:00:00Z';
 const workbook = (snapshot = workflowDemo) => XLSX.read(exportWorkflowWorkbook(snapshot), { type: 'array' });
@@ -107,6 +107,47 @@ describe('paper and Excel workflow', () => {
     expect(parse(workbook(result.snapshot!)).snapshot).toEqual(result.snapshot);
     newRow(wb, { '紙本行號': '2', '結束跟進編號': 'demo-paper-housing' });
     expect(parse(wb).snapshot).toBeUndefined();
+  });
+  it('makes an appended correction take effect, and keeps the wrong row as history', () => {
+    // 7F A室 has no other history, so the correction is the only thing that can decide coverage.
+    const unit = ['bldg-yu-an', 'bldg-yu-an-f7-A'] as const;
+    const wb = workbook();
+    // The commonest paper correction: a date typed a year out, appended in good faith.
+    newRow(wb, { '紙本行號': '1', '樓層': '7F', '單位': '7F A室', '到訪日期': excelDate('2030-05-05'), '覆蓋結果': '暫無可靠記錄' });
+    const wrongId = 'paper:QA-01:1:bldg-yu-an';
+    const before = parse(wb);
+    expect(before.issues).toEqual([]);
+    expect(before.snapshot!.observations.at(-1)?.id).toBe(wrongId);
+    const wrongStatus = getCoverageStatus(before.snapshot!, ...unit);
+
+    // Correcting it appends a second row that names the first; the original is never rewritten.
+    newRow(wb, { '紙本行號': '2', '樓層': '7F', '單位': '7F A室', '到訪日期': excelDate('2026-09-09'), '覆蓋結果': '已查看・無發現', '更正原記錄編號': wrongId, '更正原因': '日期年份錯填' });
+    const result = parse(wb);
+    expect(result.issues).toEqual([]);
+    expect(result.snapshot!.observations.at(-1)).toMatchObject({ correctsObservationId: wrongId, correctionReason: '日期年份錯填', occurredAt: '2026-09-09' });
+    // Coverage moves to the corrected version: the wrong later date no longer decides anything.
+    expect(getCoverageStatus(result.snapshot!, ...unit)).toBe('VISITED_NO_FINDING');
+    expect(wrongStatus).not.toBe('VISITED_NO_FINDING');
+    // The wrong row is untouched and still there for traceability.
+    expect(result.snapshot!.observations.find(o => o.id === wrongId)).toMatchObject({ occurredAt: '2030-05-05', coverage: 'UNKNOWN' });
+    // A correction is not a licence to rewrite: pointing at an unknown record is refused.
+    const dangling = workbook(); newRow(dangling, { '更正原記錄編號': 'paper:不存在:1:bldg-yu-an' });
+    expect(parse(dangling).snapshot).toBeUndefined();
+  });
+  it('refuses two live corrections for one record instead of guessing which wins', () => {
+    const wb = workbook();
+    newRow(wb, { '紙本行號': '1' });
+    const target = 'paper:QA-01:1:bldg-yu-an';
+    newRow(wb, { '紙本行號': '2', '更正原記錄編號': target, '更正原因': '第一次更正' });
+    const first = parse(wb);
+    expect(first.snapshot?.observations.some(o => o.correctsObservationId === target)).toBe(true);
+    // Re-export with both corrections live: the second one cannot be ordered against the first.
+    const both = workbook(); newRow(both, { '紙本行號': '1' });
+    newRow(both, { '紙本行號': '2', '更正原記錄編號': target, '更正原因': '甲' });
+    newRow(both, { '紙本行號': '3', '更正原記錄編號': target, '更正原因': '乙' });
+    const conflict = parse(both);
+    expect(conflict.snapshot).toBeUndefined();
+    expect(conflict.issues.some(i => i.severity === 'error' && i.message.includes('無法判斷'))).toBe(true);
   });
   it('supports legacy snapshots through non-destructive merge and blocks same-id conflicts', () => {
     expect(mergeWorkflow(workflowDemo, demoSnapshot).snapshot).toEqual(workflowDemo);

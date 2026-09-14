@@ -3,8 +3,8 @@ import { validateSnapshot, occurrenceSchema } from '../domain/schema';
 import { type Observation, type OutreachSnapshot } from '../domain/types';
 import { coverageLabels } from '../domain/presentation';
 import { alignDemoSnapshot } from './demoGeometry';
-import { WORKFLOW_VERSION, hkParts, assessmentLabels, buildingHeaders, contactLabels, observationRow, paperHeaders, personHeaders, sourceLabels, workflowSheets } from './workflowFormat';
-import { supportCategoryLabels } from '../domain/types';
+import { WORKFLOW_VERSION, hkParts, assessmentLabels, buildingHeaders, contactLabels, observationRow, optionalPaperHeaders, paperHeaders, personHeaders, sourceLabels, workflowSheets } from './workflowFormat';
+import { getCorrectionConflicts, supportCategoryLabels } from '../domain/types';
 import type { WorkbookImportIssue } from './workbookImport';
 
 export interface WorkflowImport { snapshot?: OutreachSnapshot; baseline?: OutreachSnapshot; issues: WorkbookImportIssue[]; counts: Record<string, number>; }
@@ -34,14 +34,14 @@ export function parseWorkflowWorkbook(buffer: ArrayBuffer, file: string, now = n
   const issues: WorkbookImportIssue[] = [];
   const add = (sheet: string, row: number | undefined, field: string, message: string, severity: 'error' | 'warning' = 'error') => issues.push({ sheet, row, field, message, severity, code: severity === 'error' ? 'WORKFLOW_INVALID' : 'WORKFLOW_NOTE' });
   for (const name of workbook.SheetNames) if (!['使用說明', '大廈總表', '個人名冊', '紙本回錄', '待跟進', '關聯封存'].includes(name)) add(name, undefined, '', '未識別的工作表，請移至另一個檔案後再匯入，避免遺漏內容。');
-  const read = (name: string, headers: string[]) => {
+  const read = (name: string, headers: string[], optionalHeaders: string[] = []) => {
     const sheet = workbook.Sheets[name];
     if (!sheet) { add(name, undefined, '', '缺少此工作表。'); return []; }
     const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: '' });
     const heading = matrix.findIndex(row => row[0] === headers[0]);
     if (heading < 0 || heading > 20) { add(name, undefined, headers[0], '找不到範本表頭。'); return []; }
     const actual = matrix[heading].map(String);
-    for (const h of headers) if (!actual.includes(h)) add(name, heading + 1, h, '缺少此欄位。');
+    for (const h of headers) if (!actual.includes(h) && !optionalHeaders.includes(h)) add(name, heading + 1, h, '缺少此欄位。');
     if (new Set(actual.filter(Boolean)).size !== actual.filter(Boolean).length) add(name, heading + 1, '', '重複欄名。');
     return matrix.slice(heading + 1).map((values, index) => {
       const row = heading + index + 2;
@@ -103,7 +103,7 @@ export function parseWorkflowWorkbook(buffer: ArrayBuffer, file: string, now = n
     }
   }
   const seen = new Set<string>();
-  for (const { row, values: v } of read('紙本回錄', paperHeaders)) {
+  for (const { row, values: v } of read('紙本回錄', paperHeaders, optionalPaperHeaders)) {
     const sheet = '紙本回錄';
     const buildingId = optional(v['大廈編號']);
     const paperRef = optional(v['紙本編號']), paperLine = optional(v['紙本行號']);
@@ -130,14 +130,19 @@ export function parseWorkflowWorkbook(buffer: ArrayBuffer, file: string, now = n
     if (!coverage) add(sheet, row, '覆蓋結果', '請明確選擇；資料不足可選「暫無可靠記錄」，不能以空白代表無發現。');
     const action = optional(v['跟進行動']);
     if (!action && ['跟進類別', '負責人', '確定跟進日期', '時間原話／待確認'].some(k => optional(v[k]))) add(sheet, row, '跟進行動', '已填跟進資料，請寫明要做的行動。');
+    const correctsId = optional(v['更正原記錄編號']);
+    if (correctsId && !incoming.observations.some(o => o.id === correctsId)) { add(sheet, row, '更正原記錄編號', '找不到要更正的原記錄；請填紙本回錄上已有的記錄編號。'); continue; }
     const visitId = optional(v['外出編號']) ?? `paper-visit:${encodeURIComponent(paperRef ?? id)}`;
     const observation: Observation = { ...flags, id, visitId, buildingId, floorId: units[0]?.floorId ?? floors[0]?.id, unitId: units[0]?.id, occurredAt, recordedAt: now, workerName: str(v['工作員']).trim(), coverage: coverage ?? 'UNKNOWN',
       contactOutcome: enumValue(v['接觸結果'], contactLabels, sheet, row, '接觸結果'), assessment: enumValue(v['住房判斷'], assessmentLabels, sheet, row, '住房判斷'), sourceType: enumValue(v['資料來源'], sourceLabels, sheet, row, '資料來源'), note: optional(v['紙本原話／備註']), evidence: str(v['依據']).split('\n').map(s => s.trim()).filter(Boolean),
       paperRef, paperLine, importSource: { file, sheet, row }, resolvesObservationId: optional(v['結束跟進編號']),
+      correctsObservationId: optional(v['更正原記錄編號']), correctionReason: optional(v['更正原因']),
       followUp: action ? { action, status: 'OPEN', category: enumValue(v['跟進類別'], supportCategoryLabels, sheet, row, '跟進類別'), assignee: optional(v['負責人']), dueDate, timingNote: optional(v['時間原話／待確認']) } : undefined };
     incoming.observations.push(observation);
     if (!incoming.visits.some(visit => visit.id === visitId)) incoming.visits.push({ ...flags, id: visitId, occurredAt, recordedAt: now, workerName: observation.workerName, note: paperRef ? `紙本 ${paperRef}` : undefined });
   }
+  // Two live corrections for one original cannot be ordered by time; a human must pick one.
+  for (const conflict of getCorrectionConflicts(incoming)) add('紙本回錄', undefined, '更正原記錄編號', `記錄 ${conflict.observationId} 同時被 ${conflict.correctionIds.join('、')} 更正，無法判斷哪一條生效；請只保留一條再匯入。`);
   // The follow-up sheet is a derived view, not a second write surface.
   const tasks = read('待跟進', referenceSheets.find(s => s.name === '待跟進')!.headers);
   const taskSpec = referenceSheets.find(s => s.name === '待跟進')!;

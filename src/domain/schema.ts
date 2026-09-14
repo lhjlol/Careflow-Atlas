@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CONTACT_OUTCOMES, COVERAGE_STATUSES, FOLLOW_UP_STATUSES, HOUSING_ASSESSMENTS, SUPPORT_CATEGORIES, type OutreachSnapshot } from './types';
+import { CONTACT_OUTCOMES, COVERAGE_STATUSES, FOLLOW_UP_STATUSES, HOUSING_ASSESSMENTS, SUPPORT_CATEGORIES, supersededObservationIds, type OutreachSnapshot } from './types';
 
 const id = z.string().trim().min(1).max(200);
 const text = z.string().max(6000);
@@ -18,6 +18,7 @@ export const observationSchema = z.object({
   sourceType: z.enum(['STAFF_OBSERVATION', 'RESIDENT_REPORT', 'UNKNOWN']).optional(), evidence: z.array(text).max(100), note: text.optional(),
   followUp: z.object({ action: id, dueDate: date.optional(), status: z.enum(FOLLOW_UP_STATUSES), category: z.enum(SUPPORT_CATEGORIES).optional(), assignee: id.optional(), timingNote: text.optional() }).optional(), resolvesObservationId: id.optional(),
   paperRef: id.optional(), paperLine: id.optional(), importSource: z.object({ file: id, sheet: id, row: z.number().int().positive() }).optional(),
+  correctsObservationId: id.optional(), correctionReason: text.optional(),
 }).refine(v => v.followUp?.status !== 'DONE' || !!v.resolvesObservationId, 'Completion must identify the original follow-up');
 
 /** Validate every entity at the replaceable storage/data boundary. */
@@ -61,5 +62,22 @@ export const snapshotSchema = z.object({
       resolved.add(o.resolvesObservationId);
     }
   });
+  // A correction never rewrites its original; it must name one, and the chain must terminate.
+  const correctionsFor = new Map<string, string[]>();
+  data.observations.forEach((o, i) => {
+    if (!o.correctsObservationId) return;
+    if (!observations.has(o.correctsObservationId) || o.correctsObservationId === o.id) { bad(['observations', i, 'correctsObservationId'], 'Correction must name an existing other event'); return; }
+    correctionsFor.set(o.correctsObservationId, [...correctionsFor.get(o.correctsObservationId) ?? [], o.id]);
+    const seen = new Set<string>([o.id]);
+    let cursor: string | undefined = o.correctsObservationId;
+    while (cursor) {
+      if (seen.has(cursor)) { bad(['observations', i, 'correctsObservationId'], 'Correction chain must not loop'); return; }
+      seen.add(cursor);
+      cursor = observations.get(cursor)?.correctsObservationId;
+    }
+  });
+  // Two live corrections for one original cannot be ordered by time; a human must pick one.
+  const superseded = supersededObservationIds(data.observations);
+  for (const [targetId, ids] of correctionsFor) if (ids.filter(id => !superseded.has(id)).length > 1) bad(['observations'], `Two live corrections for ${targetId}; keep one and resubmit the other`);
 });
 export function validateSnapshot(value: unknown): OutreachSnapshot { return snapshotSchema.parse(value); }

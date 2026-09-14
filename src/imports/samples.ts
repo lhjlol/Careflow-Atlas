@@ -7,6 +7,7 @@
  */
 import * as XLSX from 'xlsx';
 import { exportWorkflowWorkbook } from '../data/workflowWorkbook';
+import { paperHeaders } from '../data/workflowFormat';
 import { workflowDemo } from '../data/workflowDemo';
 import type { ProfileId } from './profiles';
 
@@ -26,7 +27,8 @@ export function sampleBuffer(sample: RegressionSample): ArrayBuffer {
 
 /** Header row of the real six-sheet export: title, note and spacer rows precede it. */
 const SIX_SHEET_HEADER_ROW = 5;
-const SIX_SHEET_PAPER_COLUMNS = 22;
+/** Derived, never hardcoded: appending past the real headers must not overwrite one. */
+const SIX_SHEET_PAPER_COLUMNS = paperHeaders.length;
 
 function book(sheets: Record<string, unknown[][]>): XLSX.WorkBook {
   const workbook = XLSX.utils.book_new();
