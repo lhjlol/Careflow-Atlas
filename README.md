@@ -1,86 +1,92 @@
 # CareFlow Atlas
 
-CareFlow Atlas is a frontend prototype for the Sai Ying Pun Community Living Room's Field Outreach workflow. It turns synthetic paper/Excel-shaped records into a spatial workbench for reviewing buildings, floors, unit observations, and follow-up work.
+> 西營盤社區客廳「洗樓」外展工作台 —— 用合成資料砌出嚟嘅前端原型。
 
-This repository is a polished demonstration and a frontend foundation. It is not a deployed NGO system. It has no production backend, authentication, tenant isolation, offline synchronisation, or approval system, and it must not contain real resident data.
+呢個 repo 係一個**示範原型**同前端基礎，**唔係**已經上線嘅 NGO 系統。冇正式後端、冇登入、冇多租戶、冇離線同步、冇審批流程；亦都**唔可以**入任何真實居民資料。
 
-## What works
+## 而家做得到啲乜
 
-- Parse the bundled synthetic `.xlsx` workbook in the browser and show row-level validation issues.
-- Explore an expanded 20-building district mock with 123 floors, 362 units, 56 synthetic people, and multi-visit paper histories. Load **探索完整街區** to merge it while preserving existing records; see [district scenarios](./docs/DISTRICT_DEMO.md).
-- Keep imported workbook rows separate from the internal domain model.
-- Browse synthetic buildings on a real OpenStreetMap-based Sai Ying Pun basemap.
-- Select a building, move into a pitched map view, and expand its illustrative floor stack.
-- Inspect floor and unit states, including explicit negative results, uncertain assessments, contact outcomes, and follow-ups.
-- Append a new observation without overwriting earlier history.
-- Persist the synthetic workspace in this browser through a repository and `localStorage` adapter.
-- Print an A4 building paper form; export and merge a Chinese six-sheet Excel workbook with history protection and row-level review.
-- Track housing changes, health support and service invitations with an assignee and unconfirmed timing kept verbatim.
-- Export the current synthetic domain snapshot as JSON.
-- Continue through the building list and forms when the basemap or WebGL is unavailable.
+**紙本／Excel**
 
-All business records, people, addresses, floor counts, and unit layouts are synthetic. Highlighted footprints are aligned to source basemap geometry, with synthetic business identities. The map tiles and surrounding building context are real geographic data, while highlighted CareFlow targets are illustrative.
+- 喺瀏覽器直接解析合成 `.xlsx`，逐行列出驗證問題，唔會靜靜哋丟咗有問題嘅行。
+- 匯出／合併中文六表工作簿，有歷史保護同行級覆核。
+- **追加式更正**：錯嘅記錄唔改唔刪。另開一行，喺「更正原記錄編號」填返要更正嗰條，更正鏈鏈尾生效；被更正嘅原行退出覆蓋計算，但保留喺歷史度兼標明「已被更正」。同一條原記錄有兩條並行更正就報衝突，要人手揀。
 
-## Run locally
+**地圖同外展**
 
-Verified runtime: Node.js 22.12.0 with npm 10.9.0.
+- 喺真實 OpenStreetMap 西營盤底圖上面睇合成樓宇，揀樓 → 俯衝視角 → 展開樓層堆疊。
+- 睇樓層／單位狀態：明確否定結果、不確定判斷、接觸結果、待跟進。
+- 追加新觀察，唔會覆蓋舊歷史。
+- 載入 20 幢樓嘅街區 mock（123 層、362 個單位、56 個合成人物、多次探訪紀錄），合併時保留現有記錄。
+- 底板或者 WebGL 唔得嘅時候，樓宇清單同表單一樣行得到。
+
+**其他**
+
+- 整份合成 snapshot 經 repository + `localStorage` 存喺呢個瀏覽器，亦可以匯出做 JSON。
+
+## 唔好當真嘅嘢
+
+- 所有業務記錄、人物、地址、層數、單位間隔**全部係合成**。地圖圖磚同周邊樓宇係真實地理資料，高亮嘅 CareFlow 目標係示意。
+- **未做**：後端、認證、租戶隔離、離線同步、審批、OCR／圖片識別、手機現場記錄、任何自動醫療或法律判斷。
+- **唔會**上傳機構文件去外部 AI 度、亦唔會訓練模型。
+
+## 本機運行
+
+實測環境：**Node.js v24.15.0 / npm 11.12.1**。
 
 ```bash
 npm ci
-npm run demo:generate
+npm run demo:generate   # 由 src/data/demoFixture.ts 確定性重建示範工作簿
 npm run typecheck
 npm run lint
-npm test
+npm test                # 14 個測試檔案 / 91 個用例
 npm run build
-npm run dev
+npm run dev             # vite --host 127.0.0.1
 ```
 
-Open the local URL printed by Vite. Choose **紙本與 Excel**, then **檢視 mock 範例** to review the Chinese workbook before merging. See [the paper / Excel workflow](./docs/EXCEL_WORKFLOW.md) and [the mock template](./public/demo/careflow-paper-excel-mock.xlsx). The legacy workbook remains supported. The generated file is [public/demo/careflow-field-outreach-demo.xlsx](./public/demo/careflow-field-outreach-demo.xlsx).
+開 Vite 印出嚟嘅網址，揀 **紙本與 Excel** → **檢視 mock 範例**，可以先睇中文工作簿再決定合併。想睇 production bundle 就跑 `npm run preview`。
 
-`npm run demo:generate` deterministically rebuilds that workbook from [src/data/demoFixture.ts](./src/data/demoFixture.ts). Use `npm run preview` after a build to inspect the production bundle locally.
+| 檔案 | 用途 |
+| --- | --- |
+| [docs/EXCEL_WORKFLOW.md](docs/EXCEL_WORKFLOW.md) | 中文六表流程同更正規則 |
+| [public/demo/careflow-paper-excel-mock.xlsx](public/demo/careflow-paper-excel-mock.xlsx) | 手造範本。入面有 14 個下拉選單同凍結窗格，SheetJS 讀唔到呢啲格式資訊 —— **唔好**用 SheetJS 重寫佢，會靜靜哋拆走 |
+| [public/demo/careflow-field-outreach-demo.xlsx](public/demo/careflow-field-outreach-demo.xlsx) | 舊英文工作簿，一樣支援 |
 
-## Configuration
+## 設定
 
-The default basemap style is OpenFreeMap Positron. It needs network access for map tiles, glyphs, and related style assets.
-
-To use another public MapLibre-compatible style:
+預設底圖係 OpenFreeMap Positron，要連網先攞到圖磚、glyph 同 style 資源。
 
 ```bash
 VITE_MAP_STYLE_URL=https://example.org/style.json npm run dev
 ```
 
-Anything prefixed with `VITE_` is exposed to the browser bundle. Do not place secrets there. See [.env.example](./.env.example).
+`VITE_` 開頭嘅嘢會入到瀏覽器 bundle，**唔好**放密碼，見 [.env.example](.env.example)。應用程式碼唔會將業務記錄送去地圖供應商；供應商收到嘅係正常請求地圖資源時附帶嘅網絡資訊。
 
-No business record is sent to the map provider by application code. The map provider receives normal browser requests for map resources and the user's network metadata.
-
-## Static deployment
-
-Build the site, then serve the generated `dist` directory from the root of a static site:
+## 靜態部署
 
 ```bash
-npm ci
-npm run demo:generate
-npm run build
+npm ci && npm run demo:generate && npm run build
 ```
 
-The application uses the root-relative sample path `/demo/careflow-field-outreach-demo.xlsx`, so a subdirectory deployment needs a corresponding base-path change. No runtime server or secret is required.
+將 `dist/` 由靜態網站根目錄提供就得，唔需要 runtime server 或者密碼。應用用根相對路徑 `/demo/careflow-field-outreach-demo.xlsx`，擺喺子目錄就要改 base path。
 
-The repository includes `.openai/hosting.json` for owner-only Sites hosting. Publication uses the validated `dist` output and an exact source revision; public sharing is a separate access change. A private demonstration does not provide NGO authentication or production data controls.
+`.openai/hosting.json` 係 owner-only hosting 用；private 示範**唔等於**有 NGO 認證或者正式資料管控。
 
-## Project structure
+## 專案結構
 
-- `src/domain/`: provisional domain records and derived coverage summaries.
-- `src/data/`: workbook adapter, repository boundary, local persistence, and synthetic fixtures.
-- `src/app/`: shared Zustand workspace state and application composition.
-- `src/map/`: MapLibre scene and renderer-independent spatial view model.
-- `src/components/`: import, building, observation, and history workflows.
-- `scripts/generate-demo.ts`: deterministic synthetic workbook generator.
-- `docs/`: source review, architecture, decisions, and demo script.
+- [`src/domain/`](src/domain/) — 領域記錄同覆蓋摘要（瀏覽器無關）
+- [`src/data/`](src/data/) — 工作簿適配、repository 邊界、本機持久化、合成 fixtures
+- [`src/app/`](src/app/) — Zustand 工作區狀態同應用組裝
+- [`src/map/`](src/map/) — MapLibre 場景同與 renderer 無關嘅空間 view model
+- [`src/components/`](src/components/) — 匯入、樓宇、觀察、歷史流程
+- [`scripts/generate-demo.ts`](scripts/generate-demo.ts) — 確定性合成工作簿生成器
+- [`docs/`](docs/) — 來源評審、架構、決策、示範劇本
+- [`public/demo/`](public/demo/) — 應用會 fetch 嘅工作簿；[`samples/`](samples/) — 歸檔用嘅重複副本，build 唔會用到
 
-Read [docs/SOURCE_REVIEW.md](./docs/SOURCE_REVIEW.md) for evidence boundaries and [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for the implemented design.
+邊啲係原始碼、邊啲係生成、點重建，睇 [INDEX.md](INDEX.md)；證據邊界睇 [docs/SOURCE_REVIEW.md](docs/SOURCE_REVIEW.md)；已實作設計睇 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-## Before a real pilot
+## 真正試點之前
 
-Obtain and validate the real paper form, Person-level workbook, Building-level workbook, coverage/revisit definitions, membership and household rules, device/network conditions, and the NGO's access, retention, deletion, backup, and external-provider policies. Replace synthetic adapters deliberately; do not upload real records into this prototype.
+要攞到同核實：真實紙本表格、人物層／樓宇層工作簿、覆蓋同重訪定義、成員同住戶規則、裝置同網絡條件，仲有機構嘅存取、保留、刪除、備份同外部供應商政策。合成適配器要逐步換走，**唔好**將真實記錄上傳入呢個原型。
 
-See [docs/VALIDATION.md](docs/VALIDATION.md) for automated checks, browser verification, and untested operating conditions.
+自動檢查、瀏覽器驗證同未測試嘅運行條件見 [docs/VALIDATION.md](docs/VALIDATION.md)。
