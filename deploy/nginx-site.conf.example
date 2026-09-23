@@ -1,0 +1,69 @@
+# CareFlow Atlas —— 宿主机反代样例（可选，放在**宿主机**的 nginx 上，不是容器里）。
+#
+# 容器自己只监听 HTTP 80，不处理证书。要对外用 HTTPS、要加访问限制，
+# 就在宿主机用这份配置反代到容器。
+#
+# 用法：
+#   1. cp deploy/nginx-site.conf.example /etc/nginx/sites-available/careflow-atlas.conf
+#   2. 改掉下面所有 example.org / 端口 / 路径
+#   3. ln -s /etc/nginx/sites-available/careflow-atlas.conf /etc/nginx/sites-enabled/
+#   4. nginx -t && systemctl reload nginx
+#
+# 证书用 certbot：certbot --nginx -d careflow.example.org
+
+# HTTP 一律跳 HTTPS（certbot 通常会自己加，留着做兜底）
+server {
+    listen 80;
+    listen [::]:80;
+    server_name careflow.example.org;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name careflow.example.org;
+
+    ssl_certificate     /etc/letsencrypt/live/careflow.example.org/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/careflow.example.org/privkey.pem;
+
+    # 演示工作簿上限 5MB、前端 bundle 约 1MB，留一点余量即可
+    client_max_body_size 16m;
+
+    # ── 访问限制（二选一，或都删掉） ──────────────────────────────
+    #
+    # 方案 A：Basic Auth。注意这**不是**项目要求的登录能力，只是挡路人。
+    #   生成口令文件：
+    #     docker run --rm httpd:2.4-alpine htpasswd -nbB careflow '你的口令' > /etc/nginx/.htpasswd
+    #
+    # auth_basic           "CareFlow Atlas";
+    # auth_basic_user_file /etc/nginx/.htpasswd;
+    #
+    # 方案 B：只放行机构出口 IP。
+    #
+    # allow 203.0.113.0/24;
+    # deny  all;
+    #
+    # ────────────────────────────────────────────────────────────
+
+    location / {
+        # 指向容器映射出来的宿主机端口（docker-compose.yml 里的 WEB_PORT，默认 8080）
+        proxy_pass http://127.0.0.1:8080;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # 应用是单页应用，代理层不要再做一次缓存
+        proxy_buffering off;
+    }
+}
+
+# ⚠️ 必须由**根路径**提供：应用用根相对路径 fetch('/demo/...') 取演示工作簿。
+#    不要挂成 https://example.org/careflow/ 这样的子目录，否则範例按钮会失败。

@@ -70,6 +70,8 @@ npm ci && npm run demo:generate && npm run build
 
 將 `dist/` 由靜態網站根目錄提供就得，唔需要 runtime server 或者密碼。應用用根相對路徑 `/demo/careflow-field-outreach-demo.xlsx`，擺喺子目錄就要改 base path。
 
+要交去 VPS（對方部機唔使裝 Node）就用容器：`docker compose up -d --build`，預設開 `:8080`。完整步驟、驗證清單同排錯見 [docs/DOCKER.md](docs/DOCKER.md)。容器一樣冇後端、冇登入，資料照樣留喺訪問者自己個瀏覽器。
+
 `.openai/hosting.json` 係 owner-only hosting 用；private 示範**唔等於**有 NGO 認證或者正式資料管控。
 
 ## 專案結構

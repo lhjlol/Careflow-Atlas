@@ -1,0 +1,35 @@
+# 收窄构建上下文：只让 Dockerfile 真正需要的文件进来。
+# 目的是不让依赖、构建产物、归档资料和文档进入镜像层。
+
+# 依赖与构建产物：镜像内重新安装 / 重新构建
+node_modules
+dist
+*.tsbuildinfo
+
+# 版本控制与系统痕迹
+.git
+.gitignore
+.DS_Store
+
+# 环境文件（VITE_ 变量在构建期由 build args 传入；.env.example 构建用不到）
+.env
+.env.*
+
+# 与构建无关的资料与文档
+BACKEND_GAP_ANALYSIS.md
+CLAUDE.md
+DOCKER_PLAN.md
+INDEX.md
+README.md
+docs
+samples
+
+# 本地运行与测试残留
+test-results
+playwright-report
+.private
+outputs
+.openai
+
+# 注意：src/、scripts/、public/、deploy/、package*.json、index.html、
+# vite.config.ts、tsconfig.json 必须保持可读，否则构建会失败。

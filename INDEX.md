@@ -25,12 +25,17 @@ Careflow-Atlas/
 ├── 🟢 package.json            依赖与 npm scripts
 ├── 🟢 .env.example            环境变量样例（VITE_MAP_STYLE_URL）
 ├── 🟢 .openai/hosting.json    仅所有者可见的静态托管配置（指向 dist/）
+├── 🟢 Dockerfile              容器定义 · 两阶段：Node 构建 → nginx 提供 `dist/`
+├── 🟢 .dockerignore           构建上下文排除清单（依赖、产物、资料、文档不进镜像）
+├── 🟢 docker-compose.yml      VPS 启动入口 · `docker compose up -d --build`
+├── 🟢 deploy/                 容器与部署配置 · 见第 4.1 节
 ├── 🟢 README.md               项目介绍、运行方式、部署说明
 ├── 🟢 INDEX.md                本文件 · 仓库地图
 ├── 🟢 CLAUDE.md               仓库内工作约定与四条硬规则
 ├── 🟢 BACKEND_GAP_ANALYSIS.md 后端缺口分析与实施计划（计划正文）
+├── 🟢 DOCKER_PLAN.md          Docker 封装的执行契约与计划（过程产物）
 ├── 🟢 src/                    应用源码 · 见第 2 节
-├── 🟢 docs/                   设计/演示/验证文档 · 见第 3 节
+├── 🟢 docs/                   设计/演示/验证/部署文档 · 见第 3 节
 ├── 🟢 scripts/                工作簿与几何再生成脚本 · 见第 4 节
 ├── 🟢 public/demo/            应用运行时抓取的演示工作簿 · 见第 5 节
 ├── 🟢 samples/                已归档的重复工作簿副本（不参与构建）· 见第 5 节
@@ -39,7 +44,7 @@ Careflow-Atlas/
 └── ⚪ node_modules/           依赖安装目录
 ```
 
-根目录保持只放「配置 / 三份文档 / 四个目录」。新增文件前先想清楚它属于哪一格。
+根目录保持只放「配置 / 文档 / 目录」。容器与部署配置（`Dockerfile`、`.dockerignore`、`docker-compose.yml`、`deploy/`）归「配置」，说明文档写进 `docs/`。`DOCKER_PLAN.md` 是 Docker 封装任务的契约与计划，属**过程产物**，任务收尾后应并入 `docs/`。
 
 ## 2. 源码地图 `src/`
 
@@ -127,6 +132,7 @@ Careflow-Atlas/
 | [DEMO_SCRIPT.md](./docs/DEMO_SCRIPT.md) | 要做一场约两分钟的演示时 |
 | [UI_REFINEMENT.md](./docs/UI_REFINEMENT.md) | 改界面层级与交互细节时（2026-09-11 的定向细化，非新视觉识别） |
 | [VALIDATION.md](./docs/VALIDATION.md) | 想知道验证了什么、浏览器实测做了什么、哪些工况**没测** |
+| [DOCKER.md](./docs/DOCKER.md) | 要在 VPS 上用容器部署给人用时（构建、验证、反代、访问限制、排错；含**尚未实跑**的诚实声明） |
 
 > `DEMO_SCRIPT.md` 与 `UI_REFINEMENT.md` 此前没有被 [README.md](./README.md) 链接，是从这里进入的入口。
 
@@ -142,6 +148,19 @@ Careflow-Atlas/
 **现状说明（后续迭代需注意）**：`generate-district-workbook.ts` 依赖 Codex bundled spreadsheet runtime（默认 `~/.cache/codex-runtimes/...`，可用 `CAREFLOW_ARTIFACT_RUNTIME` 覆盖），**在普通 checkout 上跑不起来**；`npm run demo:generate` 也只重建旧英文样例，**不重建全部三份工作簿**。这两个脚本目前仍是唯一的重建路径，尚未收编为应用内依赖。
 
 `outputs/` 在 `.gitignore` 内。
+
+## 4.1 容器与部署 `deploy/`
+
+| 文件 | 作用 |
+| --- | --- |
+| [nginx.conf](./deploy/nginx.conf) | **容器内**的 nginx 配置：路由、缓存分层、gzip、安全响应头 |
+| [verify.sh](./deploy/verify.sh) | 部署自检脚本。在装有 Docker 的机器上跑 `bash deploy/verify.sh`，自动跑完全部可自动化的检查项（镜像大小、Up、日志、各路由状态码与缓存头、健康检查、换端口、删容器重建、stop/start/restart、save→rmi→load、构建参数），末尾提示需人工确认的 4 项 |
+| [verify-browser.mjs](./deploy/verify-browser.mjs) | 浏览器端到端检查（可选）。用真实 Chromium 走一遍导入→解析→合并→刷新→地图，覆盖 shell 脚本够不着的「应用是否真的能跑」。需自行 `npm i -D playwright`，**故意不进 `package.json`** |
+| [nginx-site.conf.example](./deploy/nginx-site.conf.example) | **宿主机**反代样例（HTTPS、certbot、Basic Auth / IP 白名单），可选 |
+
+容器定义在根目录：[Dockerfile](./Dockerfile)、[.dockerignore](./.dockerignore)、[docker-compose.yml](./docker-compose.yml)；操作手册见 [docs/DOCKER.md](./docs/DOCKER.md)。
+
+> ⚠️ `deploy/` 里没有任何**密钥**。反代样例中的口令文件路径、域名、IP 都是占位符，实际值留在宿主机上，**不要**提交进仓库。
 
 ## 5. 演示与样例数据
 
@@ -187,5 +206,6 @@ npm run dev            # vite --host 127.0.0.1
 - `docs/` 增删文档，或某篇文档的定位发生变化。
 - `scripts/` 增删脚本，或某个脚本接入／移出 `npm run`。
 - `public/demo/` 或 `samples/` 的文件增删。
+- `deploy/` 增删文件，或容器／部署方式发生变化。
 
 仅修改 `src/` 内部实现、不改变模块划分时，**不需要**更新本文件。
